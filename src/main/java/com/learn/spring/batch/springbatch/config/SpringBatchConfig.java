@@ -4,11 +4,17 @@ package com.learn.spring.batch.springbatch.config;
 import com.learn.spring.batch.springbatch.model.Info;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.core.partition.PartitionHandler;
+import org.springframework.batch.core.partition.support.MultiResourcePartitioner;
+import org.springframework.batch.core.partition.support.Partitioner;
+import org.springframework.batch.core.partition.support.TaskExecutorPartitionHandler;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
@@ -17,16 +23,32 @@ import org.springframework.batch.item.file.LineMapper;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.core.task.TaskExecutor;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.MalformedURLException;
 
 @Configuration
 @EnableBatchProcessing
 @Slf4j
 public class SpringBatchConfig {
+
+    @Autowired
+    private JobBuilderFactory jobBuilderFactory;
+    @Autowired
+    private StepBuilderFactory stepBuilderFactory;
+    @Autowired
+    private JobExecutionListener jobExecutionListener;
+    @Autowired
+
+    private ResourcePatternResolver resourcePatternResolver;
+
 
     @Bean
     public Job job(JobBuilderFactory jobBuilderFactory,
@@ -55,18 +77,19 @@ public class SpringBatchConfig {
     }
 
     @Bean
+    @StepScope
     public FlatFileItemReader<Info> itemReader() {
         FlatFileItemReader<Info> flatFileItemReader = new FlatFileItemReader<>();
 
-        try{
+        try {
             flatFileItemReader.setResource(new FileSystemResource("src/main/resources/info.csv"));
             flatFileItemReader.setName("CSV-Reader");
             //TODO in strict mode reader must need something to read
             flatFileItemReader.setStrict(false);
             flatFileItemReader.setLinesToSkip(1);
             flatFileItemReader.setLineMapper(lineMapper());
-        }catch (Exception e){
-            log.error("Exception occurred due to file reading "+e);
+        } catch (Exception e) {
+            log.error("Exception occurred due to file reading " + e);
         }
         return flatFileItemReader;
     }
@@ -89,5 +112,53 @@ public class SpringBatchConfig {
 
         return defaultLineMapper;
     }
+
+
+    @Bean
+    public Partitioner partitioner() throws IOException {
+        MultiResourcePartitioner partitioner = new MultiResourcePartitioner();
+        partitioner.setResources(resourcePatternResolver.getResources(" file:D:/dev/springBatchExample/sample-data*.csv"));
+        return partitioner;
+    }
+
+    @Bean
+    public PartitionHandler partitionHandler() throws MalformedURLException {
+        TaskExecutorPartitionHandler retVal = new TaskExecutorPartitionHandler();
+        retVal.setTaskExecutor(taskExecutor());
+        retVal.setStep(step1());
+        retVal.setGridSize(5);
+        return retVal;
+    }
+
+    private TaskExecutor taskExecutor() {
+    }
+
+    @Bean
+    public Step step1() throws MalformedURLException {
+        return stepBuilderFactory.get("step1")
+            .<Info, Info>chunk(2)
+            .reader(reader(null))
+            .processor(processor())
+            .writer(writer())
+            .build();
+    }
+
+    @Bean
+    public Step step1Manager() throws Exception {
+        return stepBuilderFactory.get("step1.manager")
+            .partitioner("step1", partitioner())
+            .partitionHandler(partitionHandler())
+            .build();
+    }
+
+    @Bean
+    public Job processJob() throws Exception {
+        return jobBuilderFactory.get("processJob")
+            .incrementer(new RunIdIncrementer())
+            .listener(jobExecutionListener)
+            .start(step1Manager())
+            .build();
+    }
+
 
 }
