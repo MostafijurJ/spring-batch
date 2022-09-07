@@ -17,6 +17,7 @@ import org.springframework.batch.item.file.LineMapper;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
@@ -28,6 +29,9 @@ import java.io.FileNotFoundException;
 @Slf4j
 public class SpringBatchConfig {
 
+    @Value("${spring.batch.chunk.size}")
+    private int chunkSize;
+
     @Bean
     public Job job(JobBuilderFactory jobBuilderFactory,
                    StepBuilderFactory stepBuilderFactory,
@@ -37,7 +41,7 @@ public class SpringBatchConfig {
     ) {
 
         Step step = stepBuilderFactory.get("ETL-file-load")
-            .<Info, Info>chunk(10)
+            .<Info, Info>chunk(chunkSize)
             .reader(itemReader)
             .processor(itemProcessor)
             .writer(itemWriter)
