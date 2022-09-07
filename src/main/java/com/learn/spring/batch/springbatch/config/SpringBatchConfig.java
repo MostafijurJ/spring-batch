@@ -2,6 +2,8 @@ package com.learn.spring.batch.springbatch.config;
 
 
 import com.learn.spring.batch.springbatch.model.Info;
+import com.learn.spring.batch.springbatch.service.batch.DBWriter;
+import com.learn.spring.batch.springbatch.service.batch.Processor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecutionListener;
@@ -46,7 +48,6 @@ public class SpringBatchConfig {
     @Autowired
     private JobExecutionListener jobExecutionListener;
     @Autowired
-
     private ResourcePatternResolver resourcePatternResolver;
 
 
@@ -94,7 +95,6 @@ public class SpringBatchConfig {
         return flatFileItemReader;
     }
 
-    @Bean
     public LineMapper<Info> lineMapper() {
 
         DefaultLineMapper<Info> defaultLineMapper = new DefaultLineMapper<>();
@@ -130,18 +130,26 @@ public class SpringBatchConfig {
         return retVal;
     }
 
+
     private TaskExecutor taskExecutor() {
+        return new TaskExecutor() {
+            @Override
+            public void execute(Runnable task) {
+                task.run();
+            }
+        };
     }
 
     @Bean
-    public Step step1() throws MalformedURLException {
+    public Step step1(){
         return stepBuilderFactory.get("step1")
             .<Info, Info>chunk(2)
-            .reader(reader(null))
-            .processor(processor())
-            .writer(writer())
+            .reader(itemReader())
+            .processor(new Processor())
+            .writer(new DBWriter())
             .build();
     }
+
 
     @Bean
     public Step step1Manager() throws Exception {

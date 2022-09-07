@@ -10,4 +10,13 @@ class SpringBatchPocApplicationTests {
 	void contextLoads() {
 	}
 
+	private static final String TEST_STRING = "This is a test string";
+
+	@Test
+	void testString() {
+		if(TEST_STRING.contains("test")) {
+			System.out.println("Test string contains test");
+		}
+	}
+
 }

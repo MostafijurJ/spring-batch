@@ -17,12 +17,10 @@ public class DBWriter implements ItemWriter<Info> {
 
     private final AtomicInteger count = new AtomicInteger();
 
-    private UserRepository userRepository;
-
     @Autowired
-    public DBWriter (UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
+    private  UserRepository userRepository;
+
+
 
     @Override
     public void write(List<? extends Info> users) throws Exception{
